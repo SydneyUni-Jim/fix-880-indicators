@@ -1,0 +1,15 @@
+{
+  "name": "@sydneyunilibrary/fix-880-indicators",
+  "version": "1.0.0",
+  "description": "Makes the indicators on 880 fields in a MARC record be the same as their linked non-880 fields",
+  "license": "GPL-3.0",
+  "engines": {
+    "node": ">=8.0.0"
+  },
+  "dependencies": {
+    "command-line-args": "^5.0.2",
+    "command-line-usage": "^5.0.4",
+    "lodash": "^4.17.5",
+    "marcjs": "SydneyUniLibrary-Jim/marcjs#release"
+  }
+}
