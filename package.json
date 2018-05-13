@@ -8,8 +8,8 @@
   },
   "dependencies": {
     "command-line-args": "^5.0.2",
-    "command-line-usage": "^5.0.4",
-    "lodash": "^4.17.5",
-    "marcjs": "SydneyUniLibrary-Jim/marcjs#release"
+    "command-line-usage": "^5.0.5",
+    "lodash": "^4.17.10",
+    "marcjs": "github:SydneyUniLibrary-Jim/marcjs#release"
   }
 }
