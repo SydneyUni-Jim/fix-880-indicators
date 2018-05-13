@@ -21,8 +21,6 @@
 const fs = require('fs')
 const marc = require('marcjs')
 
-const { MarcFileReader } = require('./marc-file-reader')
-
 
 
 const OPTION_DEFINITIONS = [
@@ -54,34 +52,37 @@ const OPTION_DEFINITIONS = [
 
 
 
-;(async function () {
-  try {
-
-    const options = require('command-line-args')(OPTION_DEFINITIONS)
-
-    const reader = new MarcFileReader(fs.createReadStream(options['input-file']), options['input-format'])
-
-    const outputFile = (
-      options['output-file'] === '-'
-      ? process.stdout
-      : fs.createWriteStream(options['output-file'])
-    )
-    outputFile.on('error', e => {
-      console.error(e.message)
-      process.exit(1)
-    })
-    const writer = marc.getWriter(outputFile, options['output-format'])
-
-    for await (const record of reader) {
-      if (!isDeleted(record)) {
-        writer.write(fix880Indicators(record))
+;(function () {
+  const options = require('command-line-args')(OPTION_DEFINITIONS)
+  const outputFile = (
+    options['output-file'] === '-'
+    ? process.stdout
+    : fs.createWriteStream(options['output-file'])
+  )
+  outputFile.on('error', e => {
+    console.error(e.message)
+    process.exit(1)
+  })
+  const writer = marc.getWriter(outputFile, options['output-format'])
+  const inputFile = fs.createReadStream(options['input-file'])
+  const reader = marc.getReader(inputFile, options['input-format'])
+  let i = 0
+  reader.on('end', () => {
+    console.log('processed', i, 'records in total')
+  })
+  reader.on('data', record => {
+    if ((++i % 1000) === 0) {
+      console.log('processed', i, 'records so far')
+    }
+    if (!isDeleted(record)) {
+      let updatedRecord = fix880Indicators(record)
+      if (updatedRecord) {
+        writer.write(updatedRecord)
       }
     }
-
-  } catch (e) {
-    console.error(e)
-  }
+  })
 })()
+
 
 
 
@@ -90,7 +91,72 @@ function isDeleted(record) {
 }
 
 
+
 function fix880Indicators(record) {
-  // TODO
-  return record
+  let recordNum = findRecordNum(record)
+  let numChanges = 0
+  for (let field of record.fields) {
+    if (field[0] === '880') {
+      let linkedField = findLinkedField(record, field)
+      if (linkedField) {
+        if (field[1] !== linkedField[1]) {
+          field[1] = linkedField[1]
+          numChanges++
+        }
+      } else {
+        console.error("WARNING: ignoring 880 field in", recordNum, "because couldn't find linked field:", field)
+      }
+    }
+  }
+  return numChanges === 0 ? undefined : record
+}
+
+
+
+function findLinkedField(record, field) {
+  let thisSubfield6 = findAndParseSubfield6(field)
+  if (thisSubfield6) {
+    for (let other of record.fields) {
+      if (other[0] === thisSubfield6.linkingTag) {
+        let otherSubfield6 = findAndParseSubfield6(other)
+        if (
+          otherSubfield6
+          && otherSubfield6.linkingTag === field[0]
+          && otherSubfield6.occurrenceNumber === thisSubfield6.occurrenceNumber
+        ) {
+          return other
+        }
+      }
+    }
+  }
+  return undefined
+}
+
+
+
+function findAndParseSubfield6(field) {
+  for (let i = 2; i < field.length; i += 2) {
+    if (field[i] === '6') {
+      let m = /(\d+)-(\d+)/.exec(field[i+1])
+      if (m && m !== null) {
+        return { linkingTag: m[1], occurrenceNumber: m[2] }
+      }
+    }
+  }
+  return undefined
+}
+
+
+
+function findRecordNum(record) {
+  for (let field of record.fields) {
+    if (field[0] === '907') {
+      for (let i = 2; field.length; i += 2) {
+        if (field[i] === 'a') {
+          return field[i+1]
+        }
+      }
+    }
+  }
+  return undefined
 }
